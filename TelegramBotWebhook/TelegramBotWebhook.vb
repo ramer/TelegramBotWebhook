@@ -63,7 +63,7 @@ Public Class TelegramBotWebhook
         ct = cts.Token
 
         If usengrok Then
-            ngroktask = Task.Run(Sub() InitializeNgrok(ct))
+            ngroktask = Task.Run(Sub() InitializeNgrok(ct, allowedUpdates))
             webhooktask = Task.Run(Sub() InitializeWebhook(ct))
         Else
             Throw New ArgumentNullException("ngrokToken")
@@ -80,7 +80,7 @@ Public Class TelegramBotWebhook
         End If
     End Sub
 
-    Private Sub InitializeNgrok(ct As CancellationToken)
+    Private Sub InitializeNgrok(ct As CancellationToken, Optional allowedUpdates As UpdateType() = Nothing)
         Dim oldngrokproc As New List(Of Process)(Process.GetProcessesByName("ngrok"))
         oldngrokproc.ForEach(Sub(p) p.Kill())
 
@@ -113,7 +113,7 @@ Public Class TelegramBotWebhook
                     If Not String.IsNullOrEmpty(Line) Then
                         Debug.WriteLine(Line)
                         Dim lineargs = ParseArguments(Line) '.Split({" "}, StringSplitOptions.RemoveEmptyEntries)
-                        If lineargs.Length > 6 AndAlso lineargs(2) = "msg=""started tunnel""" AndAlso lineargs(6).StartsWith("url=https") Then MyBase.SetWebhookAsync(lineargs(6).Substring(4))
+                        If lineargs.Length > 6 AndAlso lineargs(2) = "msg=""started tunnel""" AndAlso lineargs(6).StartsWith("url=https") Then MyBase.SetWebhookAsync(lineargs(6).Substring(4),,, allowedUpdates)
                     End If
                 Loop Until ngrokproc.HasExited Or ct.IsCancellationRequested
 
@@ -164,6 +164,7 @@ Public Class TelegramBotWebhook
                 request.InputStream.CopyToAsync(ms)
 
                 Dim bodystring = Text.Encoding.UTF8.GetString(ms.ToArray, 0, ms.Length)
+                If String.IsNullOrEmpty(bodystring) Then Continue Do
                 Dim update As Update = JsonConvert.DeserializeObject(Of Update)(bodystring)
 
                 RaiseEvent OnUpdate(Me, update)
